@@ -1,4 +1,5 @@
 
 rootProject.name = "LFPurchases-android"
-include ':app'
+if (!System.env.JITPACK)
+    include ':app'
 include ':LFPurchases'
