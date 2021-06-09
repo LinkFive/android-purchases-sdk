@@ -1,0 +1,4 @@
+
+rootProject.name = "LFPurchases-android"
+include ':app'
+include ':LFPurchases'

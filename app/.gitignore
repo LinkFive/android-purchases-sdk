@@ -1,0 +1,6 @@
+/build
+*.aab
+
+apikey.properties
+key.properties
+key.jks
