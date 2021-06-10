@@ -19,11 +19,19 @@ import io.linkfive.purchases.util.Logger
 import io.tnx.keller_app.BuildConfig
 import io.tnx.keller_app.R
 import io.tnx.keller_app.databinding.ActivityMainBinding
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
+    private lateinit var globalScopeResponseFlowJob: Job
+    private lateinit var globalScopeSubFlowJob: Job
+    private lateinit var globalScopeActiveFlowJob: Job
 
     private val subscriptionDataObserver = Observer<LinkFiveSubscriptionData> { data ->
         // Update the UI, in this case, a TextView.
@@ -48,10 +56,11 @@ class MainActivity : AppCompatActivity() {
 
         initContent()
         initButtons()
-        initSubscriptions()
+        initSubscriptionsLiveData()
+        initSubscriptionsFlow()
     }
 
-    fun initContent(){
+    fun initContent() {
         binding.version.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
     }
 
@@ -77,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun initSubscriptions() {
+    fun initSubscriptionsLiveData() {
         LinkFivePurchases.init(
             apiKey = BuildConfig.LINKFIVE_API_KEY,
             context = this
@@ -87,6 +96,24 @@ class MainActivity : AppCompatActivity() {
         LinkFivePurchases.linkFiveSubscriptionLiveData().observe(this, subscriptionDataObserver)
         LinkFivePurchases.linkFiveActivePurchasesLiveData()
             .observe(this, activeSubscriptionDataObserver)
+    }
+
+    fun initSubscriptionsFlow() {
+        globalScopeResponseFlowJob = GlobalScope.launch {
+            LinkFivePurchases.linkFiveSubscriptionResponseFlow().collect {
+                Logger.d("FLOW: got data Response: $it")
+            }
+        }
+        globalScopeSubFlowJob = GlobalScope.launch {
+            LinkFivePurchases.linkFiveSubscriptionFlow().collect {
+                Logger.d("FLOW: got data Subscription: $it")
+            }
+        }
+        globalScopeActiveFlowJob = GlobalScope.launch {
+            LinkFivePurchases.linkFiveActivePurchasesFlow().collect {
+                Logger.d("FLOW: got data Active: $it")
+            }
+        }
     }
 
     fun buildSubscription(data: LinkFiveSubscriptionData) {
@@ -149,5 +176,12 @@ class MainActivity : AppCompatActivity() {
 
     fun handleLog(s: String) {
         binding.log.append("$s \n")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        globalScopeResponseFlowJob.cancel()
+        globalScopeSubFlowJob.cancel()
+        globalScopeActiveFlowJob.cancel()
     }
 }

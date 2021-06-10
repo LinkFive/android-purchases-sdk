@@ -8,6 +8,7 @@ import io.linkfive.purchases.clients.LinkFiveClient
 import io.linkfive.purchases.models.*
 import io.linkfive.purchases.util.Logger
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.asStateFlow
 import java.lang.IllegalStateException
 
 object LinkFivePurchases {
@@ -22,14 +23,53 @@ object LinkFivePurchases {
     fun linkFiveSubscriptionResponseLiveData() = linkFiveStore.linkFiveSubscriptionResponseLiveData
 
     /**
-     * Google Billing plus LinkFive Subscription Attribute data
+     * LinkFive Api Response Kotlin Flow.
+     *
+     * Example usage would be:
+     *
+     * ```
+     * LinkFivePurchases.linkFiveSubscriptionResponseFlow().collect {
+     *   Log.d("LinkFive Data", "data: $it")
+     * }
+     * ```
+     */
+    fun linkFiveSubscriptionResponseFlow() =
+        linkFiveStore.linkFiveSubscriptionResponseFlow.asStateFlow()
+
+    /**
+     * Google Billing plus LinkFive Subscription Attribute data Live Data
      */
     fun linkFiveSubscriptionLiveData() = linkFiveStore.linkFiveSubscriptionLiveData
 
     /**
-     * Active Purchases plus LinkFive data
+     * Google Billing plus LinkFive Subscription Attribute data Kotlin Flow
+     *
+     * Example usage would be:
+     *
+     * ```
+     * LinkFivePurchases.linkFiveSubscriptionFlow().collect {
+     *   Log.d("LinkFive Data", "data: $it")
+     * }
+     * ```
+     */
+    fun linkFiveSubscriptionFlow() = linkFiveStore.linkFiveSubscriptionFlow.asStateFlow()
+
+    /**
+     * Active Purchases plus LinkFive data as Live Data
      */
     fun linkFiveActivePurchasesLiveData() = linkFiveStore.linkFiveActiveSubscriptionLiveData
+
+    /**
+     * Active Purchases plus LinkFive data as Kotlin Flow
+     *
+     * Example usage would be:
+     * ```
+     * LinkFivePurchases.linkFiveActivePurchasesFlow().collect {
+     *   Log.d("LinkFive Data", "data: $it")
+     * }
+     * ```
+     */
+    fun linkFiveActivePurchasesFlow() = linkFiveStore.linkFiveActiveSubscriptionFlow.asStateFlow()
 
     /**
      * Initialize the client
@@ -38,7 +78,7 @@ object LinkFivePurchases {
      */
     fun init(apiKey: String, context: Context, acknowledgeLocally: Boolean = false) {
         Logger.d(apiKey)
-        if(apiKey.isBlank()){
+        if (apiKey.isBlank()) {
             throw IllegalStateException("Init LinkFive with no api Key")
         }
         Logger.d("Got apiKey: ${apiKey.substring(0, 5)}..")
