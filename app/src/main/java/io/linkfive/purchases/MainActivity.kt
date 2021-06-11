@@ -166,7 +166,7 @@ class MainActivity : AppCompatActivity() {
     fun handleActiveSubscription(data: LinkFiveActiveSubscriptionData) {
 
         binding.activeSubscription.text =
-            data.linkFiveSkuData?.mapIndexed { index, linkFivePurchaseDetail ->
+            data.linkFivePurchaseData?.mapIndexed { index, linkFivePurchaseDetail ->
                 "$index: ${linkFivePurchaseDetail.purchase.orderId} \n" +
                         "  family: ${linkFivePurchaseDetail.familyName} \n" +
                         "  attri butes: ${linkFivePurchaseDetail.attributes} \n" +

@@ -3,7 +3,7 @@ package io.linkfive.purchases.models
 import com.android.billingclient.api.Purchase
 
 data class LinkFiveActiveSubscriptionData(
-    val linkFiveSkuData: List<LinkFivePurchaseDetail>? = null,
+    val linkFivePurchaseData: List<LinkFivePurchaseDetail>? = null,
 )
 
 data class LinkFivePurchaseDetail(
