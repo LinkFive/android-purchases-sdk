@@ -3,6 +3,7 @@ package io.linkfive.purchases.clients
 import android.app.Activity
 import android.content.Context
 import com.android.billingclient.api.*
+import io.linkfive.purchases.exceptions.SkuNotFoundException
 import io.linkfive.purchases.models.LinkFiveStore
 import io.linkfive.purchases.util.Logger
 import kotlinx.coroutines.*
@@ -58,14 +59,8 @@ class GoogleBillingClient(
         linkFiveStore.getLinkFiveSubscriptionList().forEach {
             skuList.add(it.sku)
         }
-        Logger.d("test")
-        val params = SkuDetailsParams.newBuilder()
-        params.setSkusList(skuList).setType(BillingClient.SkuType.SUBS)
 
-        // leverage querySkuDetails Kotlin extension function
-        val skuDetailsResult = withContext(Dispatchers.IO) {
-            billingClient.querySkuDetails(params.build())
-        }
+        val skuDetailsResult = queryBillingSkuDetails(skuList)
 
         Logger.d("message: ${skuDetailsResult.billingResult.debugMessage} code: ${skuDetailsResult.billingResult.responseCode}")
 
@@ -82,14 +77,29 @@ class GoogleBillingClient(
         )
     }
 
-    fun purchase(skuDetails: SkuDetails, activity: Activity) {
-        // Retrieve a value for "skuDetails" by calling querySkuDetailsAsync().
-        Logger.v("Launch Billing Flow with SKU: ", skuDetails)
+    suspend fun purchase(sku: String, activity: Activity) {
+        Logger.v("Launch Billing Flow with SKU: $sku")
+
+        val skuDetailsResult = queryBillingSkuDetails(listOf(sku))
+        val skuDetail = skuDetailsResult.skuDetailsList?.first()
+            ?: throw SkuNotFoundException()
+        Logger.v("Sku Found $skuDetail")
+
         val flowParams = BillingFlowParams.newBuilder()
-            .setSkuDetails(skuDetails)
+            .setSkuDetails(skuDetail)
             .build()
         val responseCode = billingClient.launchBillingFlow(activity, flowParams).responseCode
         Logger.v("Billing ResponseCode: $responseCode")
+    }
+
+    private suspend fun queryBillingSkuDetails(skuList: List<String>): SkuDetailsResult {
+        val params = SkuDetailsParams.newBuilder().apply {
+            this.setSkusList(skuList).setType(BillingClient.SkuType.SUBS)
+        }
+
+        return withContext(Dispatchers.IO) {
+            billingClient.querySkuDetails(params.build())
+        }
     }
 
     private fun onPurchasesUpdated(

@@ -154,8 +154,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 subView.setOnClickListener {
-                    Log.d("qwe", "qwe")
-                    LinkFivePurchases.purchase(skuDetail.skuDetails, this)
+                    LinkFivePurchases.purchase(skuDetail.skuDetails.sku, this)
                 }
 
                 binding.subLayout.addView(subView)

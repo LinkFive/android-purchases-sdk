@@ -104,7 +104,15 @@ object LinkFivePurchases {
     }
 
     fun purchase(skuDetails: SkuDetails, activity: Activity) {
-        billingClient.purchase(skuDetails, activity)
+        runBlocking {
+            billingClient.purchase(skuDetails.sku, activity)
+        }
+    }
+
+    fun purchase(sku: String, activity: Activity) {
+        runBlocking {
+            billingClient.purchase(sku, activity)
+        }
     }
 
     private suspend fun fetchSubscriptions() {

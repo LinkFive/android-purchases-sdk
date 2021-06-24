@@ -166,7 +166,7 @@ class LinkFiveClient(block: LFClientConfig.() -> Unit) {
 
     enum class HostPaths(val path: String, val responseClass: KClass<*>) {
         GET_SUBSCRIPTIONS("/api/v1/subscriptions", LinkFiveSubscriptionResponse::class),
-        GET_SUBSCRIPTION_DETAIL("/api/v1/subscription/sku", LinkFiveSubscriptionResponse::class),
+        GET_SUBSCRIPTION_DETAIL("/api/v1/subscription/sku", LinkFiveSubscriptionDetailResponse::class),
         POST_PURCHASES("/api/v1/purchases/google", LinkFivePurchasesRequest::class)
     }
 }
