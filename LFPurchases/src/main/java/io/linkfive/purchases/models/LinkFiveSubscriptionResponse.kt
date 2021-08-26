@@ -6,8 +6,8 @@ data class LinkFiveSubscriptionResponse(
 
 data class LinkFiveSubscriptionResponseData(
     val platform: String,
-    val subscriptionList: List<LinkFiveSubscriptionResponseDataSubscription>,
-    val attributes: String?
+    val attributes: String?,
+    val subscriptionList: List<LinkFiveSubscriptionResponseDataSubscription>
 )
 
 data class LinkFiveSubscriptionResponseDataSubscription(

@@ -4,7 +4,7 @@ import android.util.Base64
 import androidx.lifecycle.MutableLiveData
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.SkuDetails
-import io.linkfive.purchases.util.Logger
+import io.linkfive.purchases.util.LinkFiveLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 
 data class LinkFiveStore(
@@ -24,8 +24,8 @@ data class LinkFiveStore(
     val linkFiveSubscriptionFlow: MutableStateFlow<LinkFiveSubscriptionData?> = MutableStateFlow(null),
 
     // Active Subscriptions enhanced with LinkFive data
-    val linkFiveActiveSubscriptionLiveData: MutableLiveData<LinkFiveActiveSubscriptionData> = MutableLiveData(),
-    val linkFiveActiveSubscriptionFlow: MutableStateFlow<LinkFiveActiveSubscriptionData?> = MutableStateFlow(null),
+    val linkFiveActiveSubscriptionLiveData: MutableLiveData<LinkFiveVerifiedPurchases> = MutableLiveData(),
+    val linkFiveActiveSubscriptionFlow: MutableStateFlow<LinkFiveVerifiedPurchases?> = MutableStateFlow(null),
 
 
 ) {
@@ -43,7 +43,7 @@ data class LinkFiveStore(
         skuList: List<SkuDetails>?
     ) {
         if (skuList == null || skuList.isEmpty()) {
-            Logger.d("No Sku Details found")
+            LinkFiveLogger.d("No Sku Details found")
             linkFiveSubscriptionLiveData.postValue(
                 LinkFiveSubscriptionData(
                     error = "NO_SKU_FOUND"
@@ -78,7 +78,7 @@ data class LinkFiveStore(
                 }
             )
 
-        Logger.v("Push Subscription to LiveData")
+        LinkFiveLogger.v("Push Subscription to LiveData")
         linkFiveSubscriptionLiveData.postValue(lastSubscriptionList)
         linkFiveSubscriptionFlow.value = lastSubscriptionList
     }
@@ -87,22 +87,18 @@ data class LinkFiveStore(
      * On New Active Subscription
      */
     fun onNewActivePurchases(
-        googlePurchases: List<Purchase>,
-        linkFiveSubscriptionList: LinkFiveSubscriptionDetailResponseData
+        linkFiveVerifiedPurchases: LinkFiveVerifiedPurchases?
     ) {
-        val activePurchases = googlePurchases.map { purchase ->
-            LinkFivePurchaseDetail(
-                purchase = purchase,
-                subscriptionList = linkFiveSubscriptionList.subscriptionList
-            )
-        }.toList()
+        if(linkFiveVerifiedPurchases == null){
+            linkFiveActiveSubscriptionLiveData.postValue(LinkFiveVerifiedPurchases(purchases = emptyList()))
+            return
+        }
 
-        Logger.v("found active Purchases: ${activePurchases.count()} $activePurchases")
+        LinkFiveLogger.v("found active Purchases: ${linkFiveVerifiedPurchases.purchases.count()} $linkFiveVerifiedPurchases")
 
         // Posting to liveData and kotlin Flow
-        linkFiveActiveSubscriptionLiveData.postValue(LinkFiveActiveSubscriptionData(activePurchases))
-        linkFiveActiveSubscriptionFlow.value = LinkFiveActiveSubscriptionData(activePurchases)
-
+        linkFiveActiveSubscriptionLiveData.postValue(linkFiveVerifiedPurchases)
+        linkFiveActiveSubscriptionFlow.value = linkFiveVerifiedPurchases
     }
 
     fun getLinkFiveSubscriptionList(): List<LinkFiveSubscriptionResponseDataSubscription> {

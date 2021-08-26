@@ -5,17 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
-import io.linkfive.purchases.models.LinkFiveActiveSubscriptionData
-import io.linkfive.purchases.models.LinkFiveSkuData
-import io.linkfive.purchases.models.LinkFiveSubscriptionData
-import io.linkfive.purchases.util.Logger
+import io.linkfive.purchases.models.*
+import io.linkfive.purchases.util.LinkFiveLogLevel
+import io.linkfive.purchases.util.LinkFiveLogger
 import io.tnx.keller_app.BuildConfig
 import io.tnx.keller_app.R
 import io.tnx.keller_app.databinding.ActivityMainBinding
@@ -35,12 +33,12 @@ class MainActivity : AppCompatActivity() {
 
     private val subscriptionDataObserver = Observer<LinkFiveSubscriptionData> { data ->
         // Update the UI, in this case, a TextView.
-        Logger.d("Playout data, yay", data.toString())
+        LinkFiveLogger.d("Playout data, yay", data.toString())
         buildSubscription(data)
     }
-    private val activeSubscriptionDataObserver = Observer<LinkFiveActiveSubscriptionData> { data ->
+    private val activeSubscriptionDataObserver = Observer<LinkFiveVerifiedPurchases> { data ->
         // Update the UI, in this case, a TextView.
-        Logger.d("Active Subscription, yay", data.toString())
+        LinkFiveLogger.d("Active Subscription, yay", data.toString())
         handleActiveSubscription(data)
     }
 
@@ -66,7 +64,7 @@ class MainActivity : AppCompatActivity() {
 
     fun initButtons() {
         binding.refreshBtn.setOnClickListener {
-            LinkFivePurchases.fetch(this)
+            LinkFivePurchases.fetchSubscriptions(this)
         }
         binding.sendBtn.setOnClickListener {
             val i = Intent(Intent.ACTION_SENDTO)
@@ -89,29 +87,32 @@ class MainActivity : AppCompatActivity() {
     fun initSubscriptionsLiveData() {
         LinkFivePurchases.init(
             apiKey = BuildConfig.LINKFIVE_API_KEY,
+            logLevel = LinkFiveLogLevel.TRACE,
+            linkFiveEnvironment = LinkFiveEnvironment.STAGING,
             context = this
         )
-        LinkFivePurchases.fetch(context = this)
-        Logger.logLiveData.observe(this, linkFiveLoggerObserver)
+        LinkFivePurchases.fetchSubscriptions(context = this)
+        LinkFiveLogger.logLiveData.observe(this, linkFiveLoggerObserver)
         LinkFivePurchases.linkFiveSubscriptionLiveData().observe(this, subscriptionDataObserver)
         LinkFivePurchases.linkFiveActivePurchasesLiveData()
             .observe(this, activeSubscriptionDataObserver)
     }
 
     fun initSubscriptionsFlow() {
+        LinkFiveLogger.d("On Create Flow $this")
         globalScopeResponseFlowJob = GlobalScope.launch {
             LinkFivePurchases.linkFiveSubscriptionResponseFlow().collect {
-                Logger.d("FLOW: got data Response: $it")
+                LinkFiveLogger.d("FLOW: got data Response: $it")
             }
         }
         globalScopeSubFlowJob = GlobalScope.launch {
             LinkFivePurchases.linkFiveSubscriptionFlow().collect {
-                Logger.d("FLOW: got data Subscription: $it")
+                LinkFiveLogger.d("FLOW: got data Subscription: $it")
             }
         }
         globalScopeActiveFlowJob = GlobalScope.launch {
             LinkFivePurchases.linkFiveActivePurchasesFlow().collect {
-                Logger.d("FLOW: got data Active: $it")
+                LinkFiveLogger.d("FLOW: got data Active: $it")
             }
         }
     }
@@ -162,15 +163,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun handleActiveSubscription(data: LinkFiveActiveSubscriptionData) {
+    fun handleActiveSubscription(data: LinkFiveVerifiedPurchases) {
 
         binding.activeSubscription.text =
-            data.linkFivePurchaseData?.mapIndexed { index, linkFivePurchaseDetail ->
-                "$index: ${linkFivePurchaseDetail.purchase.orderId} \n" +
+            data.purchases.mapIndexed { index, linkFivePurchaseDetail ->
+                "$index: ${linkFivePurchaseDetail.purchaseId} \n" +
                         "  family: ${linkFivePurchaseDetail.familyName} \n" +
                         "  attri butes: ${linkFivePurchaseDetail.attributes} \n" +
-                        "  skus: ${linkFivePurchaseDetail.purchase.skus.joinToString(",")}"
-            }?.joinToString("\n") ?: "got no active subscription"
+                        "  skus: ${linkFivePurchaseDetail.sku}"
+            }.joinToString("\n") ?: "got no active subscription"
     }
 
     fun handleLog(s: String) {
@@ -179,8 +180,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        globalScopeResponseFlowJob.cancel()
-        globalScopeSubFlowJob.cancel()
-        globalScopeActiveFlowJob.cancel()
+        LinkFiveLogger.d("On Destroy global scope $this")
+        //globalScopeResponseFlowJob.cancel()
+        //globalScopeSubFlowJob.cancel()
+        //globalScopeActiveFlowJob.cancel()
     }
 }

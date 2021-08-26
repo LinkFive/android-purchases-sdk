@@ -7,7 +7,7 @@ import com.github.kittinunf.fuel.core.extensions.authentication
 import com.github.kittinunf.fuel.coroutines.awaitStringResponse
 import io.linkfive.purchases.exceptions.WrongApiKeyException
 import io.linkfive.purchases.models.*
-import io.linkfive.purchases.util.Logger
+import io.linkfive.purchases.util.LinkFiveLogger
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -15,33 +15,46 @@ import kotlin.reflect.KClass
 
 
 class LinkFiveClient(block: LFClientConfig.() -> Unit) {
+    private val productionURL = "https://api.linkfive.io"
+    private val stagingUrl = "https://api.staging.linkfive.io"
 
     class LFClientConfig {
-        var host: String = "https://api.staging.linkfive.io"
+        var linkFiveEnvironment: LinkFiveEnvironment = LinkFiveEnvironment.PRODUCTION
+        var host: String = "https://api.linkfive.io"
         var apiKey: String? = null
         var appData: AppData = AppData()
-        val platform = "GOOGLE"
-        var acknowledgeLocally : Boolean = false
+        val platform: String = "GOOGLE"
+        var utmSource: String? = null
+        var userId: String? = null
+        var environment: String? = null
     }
 
-    var config: LFClientConfig = LFClientConfig().apply(block)
+    var config: LFClientConfig = LFClientConfig()
+        .apply(block)
+        .apply {
+            if (this.linkFiveEnvironment == LinkFiveEnvironment.STAGING) {
+                this.host = stagingUrl
+            } else {
+                this.host = productionURL
+            }
+        }
 
     // parser to parse Json
-    val parser = Moshi.Builder()
+    private val parser = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
         .build()
-    var subscriptionResponseParser: JsonAdapter<LinkFiveSubscriptionResponse> =
+    private var subscriptionResponseParser: JsonAdapter<LinkFiveSubscriptionResponse> =
         parser.adapter(LinkFiveSubscriptionResponse::class.java)
-    var subscriptionDetailResponseParser: JsonAdapter<LinkFiveSubscriptionDetailResponse> =
-        parser.adapter(LinkFiveSubscriptionDetailResponse::class.java)
-    var purchaseRequestParser: JsonAdapter<LinkFivePurchasesRequest> =
-        parser.adapter(LinkFivePurchasesRequest::class.java)
+    private var verifyPurchaseRequestParser: JsonAdapter<LinkFiveVerifyPurchasesRequest> =
+        parser.adapter(LinkFiveVerifyPurchasesRequest::class.java)
+    private var verifyPurchaseRespondParser: JsonAdapter<LinkFiveVerifiedPurchasesResponse> =
+        parser.adapter(LinkFiveVerifiedPurchasesResponse::class.java)
 
-    var LinkFiveErrorParser: JsonAdapter<LinkFiveError> = parser.adapter(LinkFiveError::class.java)
+    private var LinkFiveErrorParser: JsonAdapter<LinkFiveError> = parser.adapter(LinkFiveError::class.java)
 
     suspend fun getSubscriptionList(): LinkFiveSubscriptionResponseData {
         try {
-            Logger.d("Fetch subscription from LinkFive")
+            LinkFiveLogger.d("Fetch subscription from LinkFive")
             val subscriptionResponse: Triple<Request, Response, String> =
                 Fuel.get("${config.host}${HostPaths.GET_SUBSCRIPTIONS.path}")
                     .authentication().bearer("${config.apiKey}")
@@ -51,17 +64,16 @@ class LinkFiveClient(block: LFClientConfig.() -> Unit) {
             val response = subscriptionResponse.second
             val body = subscriptionResponse.third
 
-            Logger.v("Request Done")
-            Logger.v("Response StatusCode: ${response.statusCode}")
-            Logger.v("Response Data: ${body}")
+            LinkFiveLogger.v("Request Done")
+            LinkFiveLogger.v("Response StatusCode: ${response.statusCode}")
+            LinkFiveLogger.v("Response Data: ${body}")
 
             val subscriptionList = subscriptionResponseParser.fromJson(body)
                 ?: throw IllegalStateException("LinkFive Success Response Klaxon is not able to parse it: status->${response.statusCode} body->${body}")
 
-            Logger.v("Data Object: ${subscriptionList.toString()}")
+            LinkFiveLogger.v("Data Object: ${subscriptionList.toString()}")
 
             return subscriptionList.data
-
 
         } catch (e: FuelError) {
             throw handleError(
@@ -75,75 +87,38 @@ class LinkFiveClient(block: LFClientConfig.() -> Unit) {
      * send purchase to server
      * Request sku
      */
-    suspend fun onGooglePurchase(purchases: List<Purchase>): LinkFiveSubscriptionDetailResponseData {
-        Logger.d("Receiving purchases: ${purchases.size}")
-        postPurchaseToServer(purchases)
-        return fetchPurchaseDetail(purchases)
+    suspend fun verifyGooglePurchase(purchases: List<Purchase>): LinkFiveVerifiedPurchases? {
+        LinkFiveLogger.d("Receiving purchases: ${purchases.size}")
+        return postVerifyPurchaseToServer(purchases)
     }
 
-    private suspend fun postPurchaseToServer(purchases: List<Purchase>) {
-        Logger.d("Posting to server")
+    private suspend fun postVerifyPurchaseToServer(purchases: List<Purchase>): LinkFiveVerifiedPurchases? {
+        LinkFiveLogger.d("Verify Google Purchases")
         try {
-            val body = purchaseRequestParser.toJson(
-                LinkFivePurchasesRequest(
+            val body = verifyPurchaseRequestParser.toJson(
+                LinkFiveVerifyPurchasesRequest(
                     purchases,
                     sameConstructorOverload = true
                 )
             )
-            Logger.d("Sending data: $body")
-            val response: Triple<Request, Response, String> =
-                Fuel.post("${config.host}${HostPaths.POST_PURCHASES.path}")
+            LinkFiveLogger.v("Sending data: $body")
+            val responseTriple: Triple<Request, Response, String> =
+                Fuel.post("${config.host}${HostPaths.VERIFY_PURCHASE.path}")
                     .body(body)
                     .authentication().bearer("${config.apiKey}")
                     .header(getHeaders())
                     .appendHeader("Content-Type" to "application/json")
                     .awaitStringResponse()
 
-            Logger.d("Sending Purchases done, statusCode: ${response.second.statusCode}")
+            LinkFiveLogger.d("Sending Purchases done, statusCode: ${responseTriple.second.statusCode}")
+            val responseString = responseTriple.third
+
+            return verifyPurchaseRespondParser.fromJson(responseString)?.data
         } catch (e: FuelError) {
-            Logger.e("Fuel error on sending Purchase to LinkFive")
-            Logger.e("Error code: ${e.response.statusCode} data: ${String(e.errorData)}")
+            LinkFiveLogger.e("Fuel error on sending Purchase to LinkFive")
+            LinkFiveLogger.e("Error code: ${e.response.statusCode} data: ${String(e.errorData)}")
         }
-    }
-
-    private suspend fun fetchPurchaseDetail(purchases: List<Purchase>): LinkFiveSubscriptionDetailResponseData {
-        try {
-            Logger.d("Fetch Purchase Details from LinkFive")
-            val url = "${config.host}${HostPaths.GET_SUBSCRIPTION_DETAIL.path}?${
-                purchases.joinToString("&") { purchase ->
-                    purchase.skus.joinToString("&") {
-                        "sku=${it}"
-                    }
-                }
-            }"
-            Logger.v("Request to $url")
-            val subscriptionResponse: Triple<Request, Response, String> =
-                Fuel.get(url)
-                    .authentication().bearer("${config.apiKey}")
-                    .header(getHeaders())
-                    .awaitStringResponse()
-
-            val response = subscriptionResponse.second
-            val body = subscriptionResponse.third
-
-            Logger.v("Request Done")
-            Logger.v("Response StatusCode: ${response.statusCode}")
-            Logger.v("Response Data: ${body}")
-
-            val subscriptionDetailList = subscriptionDetailResponseParser.fromJson(body)
-                ?: throw IllegalStateException("LinkFive Success Response Klaxon is not able to parse it: status->${response.statusCode} body->${body}")
-
-            Logger.v("Data Object: $subscriptionDetailList")
-
-            return subscriptionDetailList.data
-
-
-        } catch (e: FuelError) {
-            throw handleError(
-                statusCode = e.response.statusCode,
-                errorString = String(e.errorData)
-            )
-        }
+        return null
     }
 
     @Throws(WrongApiKeyException::class)
@@ -160,13 +135,15 @@ class LinkFiveClient(block: LFClientConfig.() -> Unit) {
         return mapOf<String, Any>(
             "X-App-Version" to config.appData.appVersion,
             "X-Country" to config.appData.country,
-            "X-Platform" to config.platform
+            "X-Platform" to config.platform,
+            "X-User-Id" to config.userId.let { it ?: "" },
+            "X-Utm-Source" to config.utmSource.let { it ?: "" },
+            "X-Environment" to config.environment.let { it ?: "" }
         )
     }
 
     enum class HostPaths(val path: String, val responseClass: KClass<*>) {
         GET_SUBSCRIPTIONS("/api/v1/subscriptions", LinkFiveSubscriptionResponse::class),
-        GET_SUBSCRIPTION_DETAIL("/api/v1/subscription/sku", LinkFiveSubscriptionDetailResponse::class),
-        POST_PURCHASES("/api/v1/purchases/google", LinkFivePurchasesRequest::class)
+        VERIFY_PURCHASE("/api/v1/purchases/google/verify", LinkFiveVerifyPurchasesRequest::class)
     }
 }

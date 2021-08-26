@@ -6,7 +6,8 @@ import com.android.billingclient.api.*
 import io.linkfive.purchases.clients.GoogleBillingClient
 import io.linkfive.purchases.clients.LinkFiveClient
 import io.linkfive.purchases.models.*
-import io.linkfive.purchases.util.Logger
+import io.linkfive.purchases.util.LinkFiveLogLevel
+import io.linkfive.purchases.util.LinkFiveLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.asStateFlow
 import java.lang.IllegalStateException
@@ -73,42 +74,51 @@ object LinkFivePurchases {
 
     /**
      * Initialize the client
-     * @param acknowledgeLocally if set to true, the subscription will be acknowledged by
-     * the sdk instead of the server
+     * @param apiKey get your api key on www.linkfive.io
+     * @param logLevel sets the log level
+     * @param linkFiveEnvironment is just for internal testing purposes. default is Production
      */
-    fun init(apiKey: String, context: Context, acknowledgeLocally: Boolean = false) {
-        Logger.d(apiKey)
+    fun init(
+        apiKey: String, context: Context,
+        logLevel: LinkFiveLogLevel = LinkFiveLogLevel.DEBUG,
+        linkFiveEnvironment: LinkFiveEnvironment = LinkFiveEnvironment.PRODUCTION
+    ) {
+        LinkFiveLogger.logLevel = logLevel
         if (apiKey.isBlank()) {
             throw IllegalStateException("Init LinkFive with no api Key")
         }
-        Logger.d("Got apiKey: ${apiKey.substring(0, 5)}..")
+        LinkFiveLogger.d("Got apiKey: ${apiKey.substring(0, 5)}..")
         client = LinkFiveClient {
             this.apiKey = apiKey
             this.appData = AppData(context)
-            this.acknowledgeLocally = acknowledgeLocally
+            this.linkFiveEnvironment = linkFiveEnvironment
+        }
+        billingClient = GoogleBillingClient(
+            context = context,
+            linkFiveStore = linkFiveStore,
+            linkFiveClient = client
+        )
+    }
+
+    /**
+     * Fetches all Subscriptions
+     */
+    fun fetchSubscriptions(context: Context) {
+        GlobalScope.launch {
+            fetchSubscriptions()
         }
     }
 
     /**
-     * Initialize Google Billing Client and fetches all Subscriptions
+     * Purchases a SkuDetail
      */
-    fun fetch(context: Context) {
-        GlobalScope.launch {
-            fetchSubscriptions()
-            billingClient = GoogleBillingClient(
-                context = context,
-                linkFiveStore = linkFiveStore,
-                linkFiveClient = client
-            )
-        }
-    }
-
     fun purchase(skuDetails: SkuDetails, activity: Activity) {
-        runBlocking {
-            billingClient.purchase(skuDetails.sku, activity)
-        }
+        purchase(sku = skuDetails.sku, activity = activity)
     }
 
+    /**
+     * Purchases a Sku
+     */
     fun purchase(sku: String, activity: Activity) {
         runBlocking {
             billingClient.purchase(sku, activity)
@@ -118,5 +128,6 @@ object LinkFivePurchases {
     private suspend fun fetchSubscriptions() {
         val subscriptionList = client.getSubscriptionList()
         linkFiveStore.onNewSubscriptionData(subscriptionList)
+        billingClient.querySkuDetails(subscriptionList)
     }
 }
