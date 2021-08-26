@@ -39,7 +39,6 @@ class GoogleBillingClient(
                     LinkFiveLogger.v("Google Billing Connected")
 
                     GlobalScope.launch {
-                        // todo querySkuDetails()
                         fetchExistingPurchases()
                     }
                 } else {
