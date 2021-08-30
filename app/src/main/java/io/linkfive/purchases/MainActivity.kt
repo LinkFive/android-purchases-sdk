@@ -31,12 +31,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var globalScopeSubFlowJob: Job
     private lateinit var globalScopeActiveFlowJob: Job
 
-    private val subscriptionDataObserver = Observer<LinkFiveSubscriptionData> { data ->
+    private val subscriptionDataObserver = Observer<LinkFiveSubscriptionData> { data: LinkFiveSubscriptionData ->
         // Update the UI, in this case, a TextView.
         LinkFiveLogger.d("Playout data, yay", data.toString())
         buildSubscription(data)
     }
-    private val activeSubscriptionDataObserver = Observer<LinkFiveVerifiedPurchases> { data ->
+    private val activeSubscriptionDataObserver = Observer<LinkFiveVerifiedPurchases> { data: LinkFiveVerifiedPurchases ->
         // Update the UI, in this case, a TextView.
         LinkFiveLogger.d("Active Subscription, yay", data.toString())
         handleActiveSubscription(data)
